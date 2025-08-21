@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "attendance_registry"
+version = "0.1.0"
+authors = [
+    {name = "Pável Hernández Reza", email = "onnymm@outlook.com" }]
+description = "Pequeña librería diseñada para obtener registros de asistencia desde dispositivos HikVision de forma remota a través de su API."
+readme = "README.md"
+license = { file = "LICENSE" }
+dependencies = [
+    "pandas",
+    "requests",
+    "pydantic",
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
