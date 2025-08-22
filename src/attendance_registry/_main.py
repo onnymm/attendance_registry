@@ -69,6 +69,15 @@ class Assistance(Generic[_T]):
     Orden de columnas de DataFrames.
     """
 
+    _CHARACTER_FORMATTING = {
+        '帽': 'ñ',
+        '铆': 'í',
+        '煤': 'ú',
+    }
+    """
+    Mapeo de formato de caracteres.
+    """
+
     def __init__(
         self,
         devices: dict[_T, DeviceAttsDict]
@@ -224,6 +233,15 @@ class Assistance(Generic[_T]):
             .pipe(lambda df: df[ (df[ACC_EVT_API_FIELD.NET_USER] != 'admin') & (df[ACC_EVT_API_FIELD.NAME] != '') ])
             # Se asigna la columna de dispositivo
             .assign(**{ACC_EVT_API_FIELD.DEVICE: device})
+            # Formateo de caracteres
+            .assign(
+                **{
+                    ACC_EVT_API_FIELD.NAME: lambda df: (
+                        df[ACC_EVT_API_FIELD.NAME]
+                        .apply(self._character_format)
+                    )
+                }
+            )
             # Se reasignan los nombres de columna
             .rename(columns= self._DATA_TITLES)
             # Orden de columnas
@@ -418,3 +436,15 @@ class Assistance(Generic[_T]):
         }
 
         return data
+
+    def _character_format(
+        self,
+        value: str,
+    ) -> str:
+
+        # Iteración por cada caracter a reemplazar
+        for ( i, o ) in self._CHARACTER_FORMATTING.items():
+            # Reemplazo de caracteres
+            value = value.replace(i, o)
+
+        return value
