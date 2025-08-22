@@ -12,6 +12,7 @@ from ._types import (
     DeviceAttsDict,
     DeviceAtts,
 )
+from ._constants import ERRORS
 from typing import Generic, TypeVar
 from json import JSONDecodeError
 
@@ -36,7 +37,7 @@ class Assistance(Generic[_T]):
     Diccionario de datos de los dispositivos disponibles
     """
     _data_titles = {
-        ACC_EVT_API_FIELD.DATE: ACC_EVT_DATA_FIELD.DATE,
+        # ACC_EVT_API_FIELD.DATE: ACC_EVT_DATA_FIELD.DATE,
         ACC_EVT_API_FIELD.TIME: ACC_EVT_DATA_FIELD.TIME,
         ACC_EVT_API_FIELD.REGISTRY_TYPE: ACC_EVT_DATA_FIELD.REGISTRY_TYPE,
         ACC_EVT_API_FIELD.USER_ID: ACC_EVT_DATA_FIELD.USER_ID,
@@ -69,6 +70,13 @@ class Assistance(Generic[_T]):
         #### Obtención de los registros de asistencia del hoy
         Este método obtiene los registros de asistencia del día de hoy, ya sea de un dispositivo
         especificado o de todos los dispositivos.
+
+        Uso:
+        >>> # Obtención de los registros del día de hoy
+        >>> data = instance.get_today_attendance()
+        >>> 
+        >>> # Obtención de los registros del día de hoy por dispositivo específico
+        >>> data = instance.get_today_attendance('my_device_name')
         """
 
         # Obtención de la fecha del día de hoy en formato de texto
@@ -80,13 +88,39 @@ class Assistance(Generic[_T]):
 
     def get_daily_attendance(
         self,
-        date_day: str, # YYYY-MM-DD
+        date_: str | tuple[str, str], # YYYY-MM-DD
         device: _T | None = None
     ) -> pd.DataFrame:
         """
         #### Obtención de registros diarios de asistencia
-        Este endpoint obtiene todos los registros de asistencia de un día especificado.
+        Este método obtiene todos los registros de asistencia de un día especificado o
+        un rango de fecha especificado con granularidad de día y opcionalmente
+        especificando un dispositivo.
+
+        Uso:
+        >>> # Obtención de los registros de un día especificado
+        >>> data = instance.get_daily_attendance('2025-08-21')
+        >>> 
+        >>> # Obtención de los registros de un rango de fecha
+        >>> data = instance.get_daily_attendance(('2025-08-01', '2025-08-31'))
+        >>> 
+        >>> # Obtención de los registros de un día por dispositivo específico
+        >>> data = instance.get_today_attendance('2025-08-21', 'my_device_name')
         """
+
+        # Si la fecha provista es una cadena de texto...
+        if isinstance(date_, str):
+            # Se utiliza ésta para especificar el rango de fecha
+            start_date = date_
+            end_date = date_
+        # Si la fecha provista es una tupla de dos elementos...
+        elif isinstance(date_, tuple) and len(date_) == 2:
+            # Se destructuran los elementos para especificar el rango de fecha
+            ( start_date, end_date ) = date_
+        # De no ser ninguno de los dos formatos...
+        else:
+            # Se arroja un error de tipo de dato
+            raise TypeError(ERRORS.DATE_FORMAT)
 
         # Si no se especificó un dispositivo...
         if device is None:
@@ -103,7 +137,7 @@ class Assistance(Generic[_T]):
         # Iteración por cada dispositivo
         for dev_i in devices:
             # Obtención de los registros de asistencia del dispositivo i
-            attendance_i = self._get_device_attendance_per_date_range(date_day, date_day, dev_i)
+            attendance_i = self._get_device_attendance_per_date_range(start_date, end_date, dev_i)
             # Se añade el DataFrame obtenido a la lista de DataFrames por concatenar
             attendance.append(attendance_i)
 
@@ -112,7 +146,10 @@ class Assistance(Generic[_T]):
             # Concatenación de todos los DataFrames creados
             pd.concat(attendance)
             # Se ordenan los datos por fecha y hora
-            .sort_values( [ACC_EVT_API_FIELD.DATE, ACC_EVT_API_FIELD.TIME] )
+            .sort_values( [
+                # ACC_EVT_API_FIELD.DATE,
+                ACC_EVT_API_FIELD.TIME,
+            ] )
         )
 
         return total_attendance
@@ -138,10 +175,19 @@ class Assistance(Generic[_T]):
             # Obtención de columnas de fecha y hora
             .assign(
                 **{
-                    # Obtención de fecha
-                    ACC_EVT_API_FIELD.DATE: lambda df: df[ACC_EVT_API_FIELD.TIME].apply(lambda value: value.split('T')[0]),
-                    # Obtención de hora
-                    ACC_EVT_API_FIELD.TIME: lambda df: df[ACC_EVT_API_FIELD.TIME].apply(lambda value: value.split('T')[1].split('-')[0]),
+                    # Formateo de fecha
+                    ACC_EVT_API_FIELD.TIME: lambda df: (
+                        pd.to_datetime(
+                            df[ACC_EVT_API_FIELD.TIME]
+                            .apply(
+                                lambda value: (
+                                    value
+                                    .replace('T', ' ')
+                                    [:19]
+                                )
+                            )
+                        )
+                    ),
                 }
             )
             # Se descartan todos los registros que no sean registro de asistencia
@@ -150,7 +196,6 @@ class Assistance(Generic[_T]):
             [[
                 ACC_EVT_API_FIELD.USER_ID,
                 ACC_EVT_API_FIELD.NAME,
-                ACC_EVT_API_FIELD.DATE,
                 ACC_EVT_API_FIELD.TIME,
                 ACC_EVT_API_FIELD.REGISTRY_TYPE,
             ]]
