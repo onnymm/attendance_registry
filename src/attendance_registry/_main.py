@@ -36,15 +36,37 @@ class Assistance(Generic[_T]):
     """
     Diccionario de datos de los dispositivos disponibles
     """
-    _data_titles = {
-        # ACC_EVT_API_FIELD.DATE: ACC_EVT_DATA_FIELD.DATE,
+    _DATA_TITLES = {
+        ACC_EVT_API_FIELD.USER_ID: ACC_EVT_DATA_FIELD.USER_ID,
+        ACC_EVT_API_FIELD.NAME: ACC_EVT_DATA_FIELD.NAME,
         ACC_EVT_API_FIELD.TIME: ACC_EVT_DATA_FIELD.TIME,
         ACC_EVT_API_FIELD.REGISTRY_TYPE: ACC_EVT_DATA_FIELD.REGISTRY_TYPE,
-        ACC_EVT_API_FIELD.USER_ID: ACC_EVT_DATA_FIELD.USER_ID,
         ACC_EVT_API_FIELD.DEVICE: ACC_EVT_DATA_FIELD.DEVICE,
     }
     """
     Títulos de datos finales
+    """
+
+    _DATA_TYPES = {
+        ACC_EVT_DATA_FIELD.USER_ID: 'O',
+        ACC_EVT_DATA_FIELD.NAME: 'O',
+        ACC_EVT_DATA_FIELD.TIME: '<M8[ns]',
+        ACC_EVT_DATA_FIELD.REGISTRY_TYPE: 'O',
+        ACC_EVT_DATA_FIELD.DEVICE: 'O',
+    }
+    """
+    Tipos de datos.
+    """
+
+    _DATA_ORDER = [
+        ACC_EVT_DATA_FIELD.USER_ID,
+        ACC_EVT_DATA_FIELD.NAME,
+        ACC_EVT_DATA_FIELD.TIME,
+        ACC_EVT_DATA_FIELD.REGISTRY_TYPE,
+        ACC_EVT_DATA_FIELD.DEVICE,
+    ]
+    """
+    Orden de columnas de DataFrames.
     """
 
     def __init__(
@@ -168,6 +190,14 @@ class Assistance(Generic[_T]):
 
         # Obtención de los datos desde la API
         records = self._get_device_access_event_records_per_date_range(start_date, end_date, device)
+
+        # Si no existen registros en el día...
+        if not records:
+            # Se genera un DataFrame vacío
+            data = self._build_empty_data()
+
+            return data
+
         # Procesamiento de los datos
         data = (
             # Conversión de la información a DataFrame
@@ -192,20 +222,31 @@ class Assistance(Generic[_T]):
             )
             # Se descartan todos los registros que no sean registro de asistencia
             .pipe(lambda df: df[ (df[ACC_EVT_API_FIELD.NET_USER] != 'admin') & (df[ACC_EVT_API_FIELD.NAME] != '') ])
-            # Selección de columnas
-            [[
-                ACC_EVT_API_FIELD.USER_ID,
-                ACC_EVT_API_FIELD.NAME,
-                ACC_EVT_API_FIELD.TIME,
-                ACC_EVT_API_FIELD.REGISTRY_TYPE,
-            ]]
             # Se asigna la columna de dispositivo
             .assign(**{ACC_EVT_API_FIELD.DEVICE: device})
             # Se reasignan los nombres de columna
-            .rename(columns= self._data_titles)
+            .rename(columns= self._DATA_TITLES)
+            # Orden de columnas
+            [self._DATA_ORDER]
         )
 
         return data
+
+    def _build_empty_data(
+        self,
+    ) -> pd.DataFrame:
+
+        # Inicialización del DataFrame vacío
+        records = (
+            pd.DataFrame(
+                # Selección de columnas
+                columns= self._DATA_ORDER
+            )
+            # Tipado de columnas
+            .astype(self._DATA_TYPES)
+        )
+
+        return records
 
     def _get_device_access_event_records_per_date_range(
         self,
@@ -228,9 +269,14 @@ class Assistance(Generic[_T]):
 
         # Inicialización de lista de eventos de acceso
         access_event_records: list[AccessEventInfo] = []
+
+        # Si no existen registros encontrados...
+        if first_response['responseStatusStrg'] == 'NO MATCH':
+            # Se retorna la lista vacía
+            return access_event_records
+
         # Se añade la primera página de resultados a la lista de eventos de acceso
         access_event_records += first_response['InfoList']
-
         # Iteración por la cantidad de páginas para consultar desde la segunda página (Si es que hay más de una)
         for i in range(1, pages):
             # Cálculo de página

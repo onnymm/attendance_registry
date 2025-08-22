@@ -37,7 +37,7 @@ class AccessEventInfo(TypedDict):
 
 class AccessEvent(TypedDict):
     searchID: str
-    responseStatusStrg: Literal['More']
+    responseStatusStrg: Literal['More', 'OK', 'NO MATCH']
     numOfMatches: int
     totalMatches: int
     InfoList: list[AccessEventInfo]
