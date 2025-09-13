@@ -1,8 +1,10 @@
 from typing import (
     Literal,
     TypedDict,
+    TypeVar,
 )
-from pydantic import BaseModel
+
+_T = TypeVar('_T')
 
 class AccessEventInfo(TypedDict):
     major: int
@@ -45,26 +47,6 @@ class AccessEvent(TypedDict):
 class AccessEventsData(TypedDict):
     AcsEvent: AccessEvent
 
-class DeviceAttsDict(TypedDict):
-    id: str
-    """
-    ID del dispositivo
-    """
-    sn: str
-    """
-    Número de serie del dispositivo
-    """
-
-class DeviceAtts(BaseModel):
-    id: str
-    """
-    ID del dispositivo
-    """
-    sn: str
-    """
-    Número de serie del dispositivo
-    """
-
 class ACC_EVT_API_FIELD:
     NET_USER = 'netUser'
     DATE = 'date'
@@ -102,5 +84,21 @@ class AcsEventSearchJSON(TypedDict):
     solicitudes de datos hacia la API de HikVision
     """
     AcsEventCond: _AcsEventCondition
+
+class RequestData(TypedDict):
+    method: Literal['POST']
+    url: str
+    deviceSerial: str
+    accessToken: str
+    domain: Literal['https//iusopen.ezvizlife.com']
+    body: str
+    contentType: Literal['application/json']
+    bizType: 0
+    mainType: 5
+    subType: 9
+    deviceVersion: Literal['V1.2.7 build 240102']
+    model: Literal['DS-K1A340WX']
+    urlType: Literal['TEAM']
+    siteId: str
 
 DeviceName = Literal['csl', 'sjc']

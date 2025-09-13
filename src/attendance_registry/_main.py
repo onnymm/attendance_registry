@@ -3,38 +3,39 @@ import pandas as pd
 import requests
 from datetime import date
 from ._types import (
+    _T,
     ACC_EVT_API_FIELD,
     ACC_EVT_DATA_FIELD,
     AccessEvent,
     AccessEventInfo,
     AccessEventsData,
     AcsEventSearchJSON,
-    DeviceAttsDict,
-    DeviceAtts,
+    RequestData,
 )
+from uuid import uuid4
 from ._constants import ERRORS
-from typing import Generic, TypeVar
+from typing import Generic
 from json import JSONDecodeError
-
-_T = TypeVar('_T')
+from ._env import (
+    COOKIE,
+    DEVICE_MODEL,
+    SITE_ID,
+    TOKEN,
+)
 
 class Assistance(Generic[_T]):
 
-    _URL = 'http://127.0.0.1:18090/api/hikvision/ISAPI/AccessControl/AcsEvent?format=json'
+    _URL = 'https://ius-team.hikcentralconnect.com/hcc/ccbdevicebiz/v1/custom/request'
     """
     URL del endpoint para obtención de registros de asistencia
     """
-    _devices_data: dict[_T, DeviceAttsDict]
+    _devices_data: dict[_T, str]
     """
     Datos de los dispositivos
     """
     _MAX_RESULTS_QTY = 24
     """
     Constante de cantidad máxima de resultados
-    """
-    _devices: dict[_T, DeviceAtts]
-    """
-    Diccionario de datos de los dispositivos disponibles
     """
     _DATA_TITLES = {
         ACC_EVT_API_FIELD.USER_ID: ACC_EVT_DATA_FIELD.USER_ID,
@@ -80,18 +81,11 @@ class Assistance(Generic[_T]):
 
     def __init__(
         self,
-        devices: dict[_T, DeviceAttsDict]
+        devices: dict[_T, str]
     ) -> None:
 
         # Se guardan los datos de los dispositos
         self._devices_data = devices
-
-        # Se crean los BaseModel de los datos
-        self._devices = {
-            device_name: DeviceAtts(**device_atts)
-            for ( device_name, device_atts )
-            in self._devices_data.items()
-        }
 
     def get_today_attendance(
         self,
@@ -320,8 +314,8 @@ class Assistance(Generic[_T]):
         """
 
         # Obtención del JSON y encabezados de eventos de acceso
-        access_event_json = self._build_access_event_search_json(offset, start_date, end_date)
-        access_event_headers = self._build_access_event_headers(device)
+        access_event_json = self._build_access_event_search_json(offset, start_date, end_date, device)
+        access_event_headers = self._build_access_event_headers()
 
         # Solicitud de datos al endpoint
         response = requests.post(
@@ -332,9 +326,17 @@ class Assistance(Generic[_T]):
 
         try:
             # Obtención del diccionario de datos
-            content: AccessEventsData = json.loads(response.content)
+            content: AccessEventsData = (
+                # Se carga el cuerpo de respuesta de...
+                json.loads(
+                    # Se carga la respuesta desde un JSON
+                    json.loads(response.content)
+                    # Acceso al cuerpo de respuesta
+                    ['data']['responseBody']
+                )
+            )
         except JSONDecodeError:
-            raise AssertionError('Actualiza las IDs de la API')
+            raise AssertionError('Actualiza los datos de autenticación')
         # Obtención de los datos de eventos de acceso
         data = content['AcsEvent']
 
@@ -342,65 +344,40 @@ class Assistance(Generic[_T]):
 
     def _build_access_event_headers(
         self,
-        device: _T,
     ) -> dict:
         """
         #### Construcción de los encabezados de eventos de acceso
         Este método construye los encabezados usados para solicitud de datos de eventos de acceso, en base al dispositivo especificado.
         """
 
-        # Obtención de URL de referencia
-        referer = self._get_referer_url(device)
         # Construcción de los encabezados
         headers = {
             'Accept': '*/*',
             'Accept-Encoding': 'gzip, deflate, br, zstd',
             'Accept-Language': 'es-419,es;q=0.9',
-            'Cache-Control': 'max-age=0',
-            'Connection': 'keep-alive',
-            'Content-Length': '118',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
-            'If-Modified-Since': '0',
-            'Sec-Ch-Ua': '"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"',
+            'Content-Type': 'application/json',
+            'Cookie': f'JSESSIONID={COOKIE}',
+            'Origin': 'https://www.hik-connect.com',
+            'Priority': 'u=1, i',
+            'Referer': 'https://www.hik-connect.com/',
+            'Sec-Ch-Ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"',
             'Sec-Fetch-Dest': 'empty',
             'Sec-Fetch-Mode': 'cors',
-            'Sec-Fetch-Site': 'same-origin',
+            'Sec-Fetch-Site': 'cors-site',
             'Sec-Fetch-Storage-Access': 'active',
-            'Referer': referer,
-            'X-Requested-With': 'XMLHttpRequest',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
-            'Host': '127.0.0.1:18090',
-            'Origin': 'http://127.0.0.1:18090',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
         }
 
         return headers
-
-    def _get_referer_url(
-        self,
-        device: _T,
-    ) -> str:
-        """
-        #### Dispositivo de referencia
-        Este método crea un atributo en URL que contiene los datos de ID y número de serie del dispositivo del que se desean obtener los datos.
-
-        Ejemplo de retorno:
-        >>> f'http://127.0.0.1:18090/deviceCfgNew/{ID DEL DISPOSITIVO}/0/{NÚMERO DE SERIE}/accessControl/WebConfigCtrl/Packages/R0401/webs_4.0_isapi/index.asp'
-        """
-
-        # Obtención de los atributos del dispositivo especificado
-        device_atts = self._devices[device]
-        # Construcción de la URL de referencia
-        data = f'http://127.0.0.1:18090/deviceCfgNew/{device_atts.id}/0/{device_atts.sn}/accessControl/WebConfigCtrl/Packages/R0401/webs_4.0_isapi/index.asp'
-
-        return data
 
     def _build_access_event_search_json(
         self,
         offset: int,
         start_date: str, # YYYY-MM-DD
         end_date: str, # YYYY-MM-DD
+        device: _T,
     ) -> AcsEventSearchJSON:
         """
         #### Construcción de JSON de eventos de acceso
@@ -422,10 +399,13 @@ class Assistance(Generic[_T]):
         >>> }
         """
 
-        # Construcción de los datos
-        data = {
+        # Obtención del número de serie del dispositivo
+        sn = self._get_device_sn(device)
+
+        # Construcción de los parámetros
+        params: AcsEventSearchJSON = {
             "AcsEventCond": {
-                "searchID": "24afd955-d334-4480-b74e-3f84e6933c05",
+                "searchID": f"{uuid4()}",
                 "searchResultPosition": offset,
                 "maxResults": self._MAX_RESULTS_QTY,
                 "major": 0,
@@ -435,7 +415,35 @@ class Assistance(Generic[_T]):
             },
         }
 
+        # Construcción de los datos de la solicitud
+        data: RequestData = {
+            'method': 'POST',
+            'url': '/ISAPI/AccessControl/AcsEvent?format=json',
+            'deviceSerial': sn,
+            'accessToken': TOKEN,
+            'domain': 'https://iusopen.ezvizlife.com',
+            'body': json.dumps(params),
+            'contentType': 'application/json',
+            'bizType': 0,
+            'mainType': 5,
+            'subType': 9,
+            'deviceVersion': 'V1.2.7 build 240102',
+            'model': DEVICE_MODEL,
+            'urlType': 'TEAM',
+            'siteId': SITE_ID,
+        }
+
         return data
+
+    def _get_device_sn(
+        self,
+        device: _T,
+    ) -> str:
+
+        # Obtención del número de serie del dispositivo
+        sn = self._devices_data[device]
+
+        return sn
 
     def _character_format(
         self,
