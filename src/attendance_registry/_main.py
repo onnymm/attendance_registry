@@ -22,6 +22,7 @@ from ._env import (
     SITE_ID,
     TOKEN,
 )
+from ._settings import TIME_OFFSET
 
 class Assistance(Generic[_T]):
 
@@ -410,8 +411,8 @@ class Assistance(Generic[_T]):
                 "maxResults": self._MAX_RESULTS_QTY,
                 "major": 0,
                 "minor": 0,
-                "startTime": f"{start_date}T00:00:00+00:00",
-                "endTime": f"{end_date}T23:59:59+00:00",
+                "startTime": f"{start_date}T00:00:00-{TIME_OFFSET:02d}:00",
+                "endTime": f"{end_date}T23:59:59-{TIME_OFFSET:02d}:00",
             },
         }
 
