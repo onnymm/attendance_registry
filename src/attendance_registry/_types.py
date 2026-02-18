@@ -1,3 +1,7 @@
+from datetime import (
+    date,
+    datetime,
+)
 from typing import (
     Literal,
     TypedDict,
@@ -102,3 +106,6 @@ class RequestData(TypedDict):
     siteId: str
 
 DeviceName = Literal['csl', 'sjc']
+
+_DatetimeOrString = str | date | datetime
+_DateOrDateRange = _DatetimeOrString | tuple[_DatetimeOrString]

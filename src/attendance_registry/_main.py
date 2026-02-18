@@ -11,33 +11,24 @@ from ._types import (
     AccessEventsData,
     AcsEventSearchJSON,
     RequestData,
+    _DateOrDateRange,
 )
-from uuid import uuid4
-from ._constants import ERRORS
-from typing import Generic
 from json import JSONDecodeError
+from typing import Optional
+from uuid import uuid4
 from ._env import (
     COOKIE,
     DEVICE_MODEL,
     SITE_ID,
     TOKEN,
 )
-from ._settings import TIME_OFFSET
+from ._execution_context import _ExecutionContext
+from ._interface import _Base_Assistance
+from ._resources import _DeviceInfo
+from ._settings import MAX_RESULTS_QTY
 
-class Assistance(Generic[_T]):
+class Assistance(_Base_Assistance[_T]):
 
-    _URL = 'https://ius-team.hikcentralconnect.com/hcc/ccbdevicebiz/v1/custom/request'
-    """
-    URL del endpoint para obtención de registros de asistencia
-    """
-    _devices_data: dict[_T, str]
-    """
-    Datos de los dispositivos
-    """
-    _MAX_RESULTS_QTY = 24
-    """
-    Constante de cantidad máxima de resultados
-    """
     _DATA_TITLES = {
         ACC_EVT_API_FIELD.USER_ID: ACC_EVT_DATA_FIELD.USER_ID,
         ACC_EVT_API_FIELD.NAME: ACC_EVT_DATA_FIELD.NAME,
@@ -82,15 +73,18 @@ class Assistance(Generic[_T]):
 
     def __init__(
         self,
-        devices: dict[_T, str]
+        devices: dict[_T, str],
+        tz_offset: int = 0,
     ) -> None:
 
         # Se guardan los datos de los dispositos
         self._devices_data = devices
+        # Se guarda el desfase de zona horaria
+        self._tz_offset = tz_offset
 
     def get_today_attendance(
         self,
-        device: _T | None = None
+        device: Optional[_T] = None
     ) -> pd.DataFrame:
         """
         #### Obtención de los registros de asistencia del hoy
@@ -114,7 +108,7 @@ class Assistance(Generic[_T]):
 
     def get_daily_attendance(
         self,
-        date_: str | tuple[str, str], # YYYY-MM-DD
+        date_or_range: _DateOrDateRange,
         device: _T | None = None
     ) -> pd.DataFrame:
         """
@@ -134,36 +128,16 @@ class Assistance(Generic[_T]):
         >>> data = instance.get_today_attendance('2025-08-21', 'my_device_name')
         """
 
-        # Si la fecha provista es una cadena de texto...
-        if isinstance(date_, str):
-            # Se utiliza ésta para especificar el rango de fecha
-            start_date = date_
-            end_date = date_
-        # Si la fecha provista es una tupla de dos elementos...
-        elif isinstance(date_, tuple) and len(date_) == 2:
-            # Se destructuran los elementos para especificar el rango de fecha
-            ( start_date, end_date ) = date_
-        # De no ser ninguno de los dos formatos...
-        else:
-            # Se arroja un error de tipo de dato
-            raise TypeError(ERRORS.DATE_FORMAT)
-
-        # Si no se especificó un dispositivo...
-        if device is None:
-            # Se obtiene la lista de todos los dispositivos
-            devices: list[_T] = [ dev_key for dev_key in self._devices_data.keys() ]
-        # Si se especificó un dispositivo
-        else:
-            # Se convierte éste a una lista de un elemento
-            devices: list[_T] = [device]
+        # Inicialización de contexto de ejecución
+        ctx = _ExecutionContext(self, date_or_range, device)
 
         # Inicialización de lista de DataFrames a concatenar para el resultado final
         attendance: list[pd.DataFrame] = []
 
         # Iteración por cada dispositivo
-        for dev_i in devices:
+        for device_i in ctx.devices:
             # Obtención de los registros de asistencia del dispositivo i
-            attendance_i = self._get_device_attendance_per_date_range(start_date, end_date, dev_i)
+            attendance_i = self._get_device_attendance_per_date_range(ctx, device_i)
             # Se añade el DataFrame obtenido a la lista de DataFrames por concatenar
             attendance.append(attendance_i)
 
@@ -182,9 +156,8 @@ class Assistance(Generic[_T]):
 
     def _get_device_attendance_per_date_range(
         self,
-        start_date: str, # YYYY-MM-DD
-        end_date: str, # YYYY-MM-DD
-        device: _T,
+        ctx: _ExecutionContext,
+        device: _DeviceInfo,
     ) -> pd.DataFrame:
         """
         #### Obtención de registros de asistencia desde un dispositivo
@@ -193,7 +166,7 @@ class Assistance(Generic[_T]):
         """
 
         # Obtención de los datos desde la API
-        records = self._get_device_access_event_records_per_date_range(start_date, end_date, device)
+        records = self._get_device_access_event_records_per_date_range(ctx, device.sn)
 
         # Si no existen registros en el día...
         if not records:
@@ -227,7 +200,7 @@ class Assistance(Generic[_T]):
             # Se descartan todos los registros que no sean registro de asistencia
             .pipe(lambda df: df[ (df[ACC_EVT_API_FIELD.NET_USER] != 'admin') & (df[ACC_EVT_API_FIELD.NAME] != '') ])
             # Se asigna la columna de dispositivo
-            .assign(**{ACC_EVT_API_FIELD.DEVICE: device})
+            .assign(**{ACC_EVT_API_FIELD.DEVICE: device.label})
             # Formateo de caracteres
             .assign(
                 **{
@@ -263,9 +236,8 @@ class Assistance(Generic[_T]):
 
     def _get_device_access_event_records_per_date_range(
         self,
-        start_date: str, # YYYY-MM-DD
-        end_date: str, # YYYY-MM-DD
-        device: _T,
+        ctx: _ExecutionContext,
+        sn: str,
     ) -> list[AccessEventInfo]:
         """
         #### Obtención de registros de acceso de dispositivo
@@ -274,11 +246,11 @@ class Assistance(Generic[_T]):
         """
 
         # Obtención de la primera respuesta desde la API para obtener el número total de registros existentes
-        first_response = self._get_access_event_data_page(start_date, end_date, device)
+        first_response = self._get_access_event_data_page(ctx, sn)
         # Obtención del número total de registros existentes
         total_matches = first_response['totalMatches']
         # Cálculo de páginas totales para consultar
-        pages = total_matches // self._MAX_RESULTS_QTY + int(total_matches % self._MAX_RESULTS_QTY > 0)
+        pages = total_matches // MAX_RESULTS_QTY + int(total_matches % MAX_RESULTS_QTY > 0)
 
         # Inicialización de lista de eventos de acceso
         access_event_records: list[AccessEventInfo] = []
@@ -293,9 +265,9 @@ class Assistance(Generic[_T]):
         # Iteración por la cantidad de páginas para consultar desde la segunda página (Si es que hay más de una)
         for i in range(1, pages):
             # Cálculo de página
-            page = i * self._MAX_RESULTS_QTY
+            page = i * MAX_RESULTS_QTY
             # Obtención de los datos desde la API
-            response = self._get_access_event_data_page(start_date, end_date, device, page)
+            response = self._get_access_event_data_page(ctx, sn, page)
             # Se añaden los resultados a la lista de eventos de acceso
             access_event_records += response['InfoList']
 
@@ -303,10 +275,9 @@ class Assistance(Generic[_T]):
 
     def _get_access_event_data_page(
         self,
-        start_date: str, # YYYY-MM-DD
-        end_date: str, # YYYY-MM-DD
-        device: _T,
-        offset: int = 0,
+        ctx: _ExecutionContext,
+        sn: str,
+        page: int = 0,
     ) -> AccessEvent:
         """
         #### Obtención de los eventos de acceso desde la API
@@ -315,7 +286,7 @@ class Assistance(Generic[_T]):
         """
 
         # Obtención del JSON y encabezados de eventos de acceso
-        access_event_json = self._build_access_event_search_json(offset, start_date, end_date, device)
+        access_event_json = self._build_access_event_search_json(ctx, sn, page)
         access_event_headers = self._build_access_event_headers()
 
         # Solicitud de datos al endpoint
@@ -375,10 +346,9 @@ class Assistance(Generic[_T]):
 
     def _build_access_event_search_json(
         self,
-        offset: int,
-        start_date: str, # YYYY-MM-DD
-        end_date: str, # YYYY-MM-DD
-        device: _T,
+        ctx: _ExecutionContext,
+        sn: str,
+        page: int = 0,
     ) -> AcsEventSearchJSON:
         """
         #### Construcción de JSON de eventos de acceso
@@ -401,18 +371,18 @@ class Assistance(Generic[_T]):
         """
 
         # Obtención del número de serie del dispositivo
-        sn = self._get_device_sn(device)
+        # sn = self._get_device_sn(device)
 
         # Construcción de los parámetros
         params: AcsEventSearchJSON = {
             "AcsEventCond": {
                 "searchID": f"{uuid4()}",
-                "searchResultPosition": offset,
+                "searchResultPosition": page,
                 "maxResults": self._MAX_RESULTS_QTY,
                 "major": 0,
                 "minor": 0,
-                "startTime": f"{start_date}T00:00:00-{TIME_OFFSET:02d}:00",
-                "endTime": f"{end_date}T23:59:59-{TIME_OFFSET:02d}:00",
+                "startTime": ctx.start_date,
+                "endTime": ctx.end_date,
             },
         }
 
@@ -436,15 +406,15 @@ class Assistance(Generic[_T]):
 
         return data
 
-    def _get_device_sn(
-        self,
-        device: _T,
-    ) -> str:
+    # def _get_device_sn(
+    #     self,
+    #     device: _T,
+    # ) -> str:
 
-        # Obtención del número de serie del dispositivo
-        sn = self._devices_data[device]
+    #     # Obtención del número de serie del dispositivo
+    #     sn = self._devices_data[device]
 
-        return sn
+    #     return sn
 
     def _character_format(
         self,
