@@ -9,3 +9,5 @@ class ERRORS:
 class REGEX:
     DATETIME_STRUCTURE = r'^\d{4}(-\d{2}){2}(\s|T)\d{2}(:\d{2}){2}$'
     DATE_STRUCTURE = r'^\d{4}(-\d{2}){2}$'
+
+ENV_VAR_PREFIX = 'ATT_'

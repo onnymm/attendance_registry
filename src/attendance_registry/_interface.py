@@ -33,11 +33,6 @@ class _Base_Assistance(Generic[_T]):
     Orden de columnas de DataFrames.
     """
 
-    _tz_offset: int
-    """
-    Desfase de horas en huso horario.
-    """
-
     _CHARACTER_FORMATTING: dict[str, str]
     """
     Mapeo de formato de caracteres.

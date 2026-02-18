@@ -16,6 +16,7 @@ from ._constants import (
 )
 from ._interface import _Base_Assistance
 from ._resources import _DeviceInfo
+from ._settings import CONFIG
 from ._types import (
     _T,
     _DateOrDateRange,
@@ -96,7 +97,7 @@ class _ExecutionContext(Generic[_T]):
 
             # Se asigna el huso horario
             self._tz = (
-                timezone( timedelta(hours= self._main_ctx._main._tz_offset) )
+                timezone( timedelta(hours= CONFIG.TIME_OFFSET) )
             )
 
         def _define_date_range(

@@ -16,16 +16,10 @@ from ._types import (
 from json import JSONDecodeError
 from typing import Optional
 from uuid import uuid4
-from ._env import (
-    COOKIE,
-    DEVICE_MODEL,
-    SITE_ID,
-    TOKEN,
-)
 from ._execution_context import _ExecutionContext
 from ._interface import _Base_Assistance
 from ._resources import _DeviceInfo
-from ._settings import MAX_RESULTS_QTY
+from ._settings import CONFIG
 
 class Assistance(_Base_Assistance[_T]):
 
@@ -74,13 +68,10 @@ class Assistance(_Base_Assistance[_T]):
     def __init__(
         self,
         devices: dict[_T, str],
-        tz_offset: int = 0,
     ) -> None:
 
-        # Se guardan los datos de los dispositos
+        # Se guardan los datos de los dispositivos
         self._devices_data = devices
-        # Se guarda el desfase de zona horaria
-        self._tz_offset = tz_offset
 
     def get_today_attendance(
         self,
@@ -250,7 +241,7 @@ class Assistance(_Base_Assistance[_T]):
         # Obtención del número total de registros existentes
         total_matches = first_response['totalMatches']
         # Cálculo de páginas totales para consultar
-        pages = total_matches // MAX_RESULTS_QTY + int(total_matches % MAX_RESULTS_QTY > 0)
+        pages = total_matches // CONFIG.MAX_RESULTS_QTY + int(total_matches % CONFIG.MAX_RESULTS_QTY > 0)
 
         # Inicialización de lista de eventos de acceso
         access_event_records: list[AccessEventInfo] = []
@@ -265,7 +256,7 @@ class Assistance(_Base_Assistance[_T]):
         # Iteración por la cantidad de páginas para consultar desde la segunda página (Si es que hay más de una)
         for i in range(1, pages):
             # Cálculo de página
-            page = i * MAX_RESULTS_QTY
+            page = i * CONFIG.MAX_RESULTS_QTY
             # Obtención de los datos desde la API
             response = self._get_access_event_data_page(ctx, sn, page)
             # Se añaden los resultados a la lista de eventos de acceso
@@ -328,7 +319,7 @@ class Assistance(_Base_Assistance[_T]):
             'Accept-Encoding': 'gzip, deflate, br, zstd',
             'Accept-Language': 'es-419,es;q=0.9',
             'Content-Type': 'application/json',
-            'Cookie': f'JSESSIONID={COOKIE}',
+            'Cookie': f'JSESSIONID={CONFIG.COOKIE}',
             'Origin': 'https://www.hik-connect.com',
             'Priority': 'u=1, i',
             'Referer': 'https://www.hik-connect.com/',
@@ -378,7 +369,7 @@ class Assistance(_Base_Assistance[_T]):
             "AcsEventCond": {
                 "searchID": f"{uuid4()}",
                 "searchResultPosition": page,
-                "maxResults": self._MAX_RESULTS_QTY,
+                "maxResults": CONFIG.MAX_RESULTS_QTY,
                 "major": 0,
                 "minor": 0,
                 "startTime": ctx.start_date,
@@ -391,7 +382,7 @@ class Assistance(_Base_Assistance[_T]):
             'method': 'POST',
             'url': '/ISAPI/AccessControl/AcsEvent?format=json',
             'deviceSerial': sn,
-            'accessToken': TOKEN,
+            'accessToken': CONFIG.TOKEN,
             'domain': 'https://iusopen.ezvizlife.com',
             'body': json.dumps(params),
             'contentType': 'application/json',
@@ -399,9 +390,9 @@ class Assistance(_Base_Assistance[_T]):
             'mainType': 5,
             'subType': 9,
             'deviceVersion': 'V1.2.7 build 240102',
-            'model': DEVICE_MODEL,
+            'model': CONFIG.DEVICE_MODEL,
             'urlType': 'TEAM',
-            'siteId': SITE_ID,
+            'siteId': CONFIG.SITE_ID,
         }
 
         return data
