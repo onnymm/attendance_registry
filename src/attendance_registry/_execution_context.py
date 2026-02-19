@@ -165,7 +165,7 @@ class _ExecutionContext(Generic[_D]):
                 # Se añade el huso horario
                 .astimezone(self._tz)
                 # Se formatea a texto
-                .isoformat()
+                .isoformat(timespec= 'seconds')
             )
 
             return resolved_value
@@ -217,7 +217,7 @@ class _ExecutionContext(Generic[_D]):
                     tzinfo= self._tz,
                 )
                 # Se formatea a texto
-                .isoformat()
+                .isoformat(timespec= 'seconds')
             )
 
             return resolved_value
@@ -249,7 +249,7 @@ class _ExecutionContext(Generic[_D]):
                     + timedelta(hours= 23, minutes= 59, seconds= 59)
                 )
                 # Se formatea a texto
-                .isoformat()
+                .isoformat(timespec= 'seconds')
             )
 
             return resolved_value
