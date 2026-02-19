@@ -11,7 +11,7 @@ description = "Pequeña librería diseñada para obtener registros de asistencia
 readme = "README.md"
 license = { file = "LICENSE" }
 dependencies = [
-    "pandas",
+    "pandas~=2.3.3",
     "requests",
     "pydantic",
 ]
