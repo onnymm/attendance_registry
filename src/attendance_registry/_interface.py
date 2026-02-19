@@ -3,44 +3,21 @@ from typing import (
     Generic,
     Optional,
 )
-from ._types import (
-    _T,
-    _DateOrDateRange,
+from ._typing import (
+    _D,
+    DateOrDateRange,
 )
 
-class _Base_Assistance(Generic[_T]):
+class _Base_Assistance(Generic[_D]):
 
-    _URL = 'https://ius-team.hikcentralconnect.com/hcc/ccbdevicebiz/v1/custom/request'
-    """
-    URL del endpoint para obtención de registros de asistencia
-    """
-    _devices_data: dict[_T, str]
+    _devices_data: dict[_D, str]
     """
     Datos de los dispositivos
-    """
-    _DATA_TITLES: dict
-    """
-    Títulos de datos finales
-    """
-
-    _DATA_TYPES: dict
-    """
-    Tipos de datos.
-    """
-
-    _DATA_ORDER: list[str]
-    """
-    Orden de columnas de DataFrames.
-    """
-
-    _CHARACTER_FORMATTING: dict[str, str]
-    """
-    Mapeo de formato de caracteres.
     """
 
     def get_today_attendance(
         self,
-        device: Optional[_T] = None
+        device: Optional[_D] = None,
     ) -> pd.DataFrame:
         """
         #### Obtención de los registros de asistencia del hoy
@@ -58,8 +35,8 @@ class _Base_Assistance(Generic[_T]):
 
     def get_daily_attendance(
         self,
-        date_or_range: _DateOrDateRange,
-        device: _T | None = None
+        date_or_range: DateOrDateRange,
+        device: Optional[_D] = None,
     ) -> pd.DataFrame:
         """
         #### Obtención de registros diarios de asistencia

@@ -1,3 +1,21 @@
+class COLUMN:
+    DATE = 'date'
+    TIME = 'time'
+    NAME = 'name'
+    USER_ID = 'user_id'
+    REGISTRY_TYPE = 'status'
+    DEVICE = 'device'
+    REGISTRY_TIME = 'registry_time'
+
+class API_FIELD:
+    NET_USER = 'netUser'
+    DATE = 'date'
+    TIME = 'time'
+    NAME = 'name'
+    USER_ID = 'employeeNoString'
+    REGISTRY_TYPE = 'attendanceStatus'
+    DEVICE = 'device'
+
 class ERRORS:
     DATE_FORMAT = 'La fecha provista debe ser una cadena de texto o una tupla de dos cadenas de texto.'
     ONLY_DATETIMELIKE = 'El valor de fecha o rango de fecha debe ser [str], [date], [datetime] o una tupla de dos elementos de cualquiera de los tipos antes mencioanados.'
@@ -10,4 +28,10 @@ class REGEX:
     DATETIME_STRUCTURE = r'^\d{4}(-\d{2}){2}(\s|T)\d{2}(:\d{2}){2}$'
     DATE_STRUCTURE = r'^\d{4}(-\d{2}){2}$'
 
+URL = 'https://ius-team.hikcentralconnect.com/hcc/ccbdevicebiz/v1/custom/request'
+"""
+URL del endpoint para obtención de registros de asistencia
+"""
+
 ENV_VAR_PREFIX = 'ATT_'
+'Prefijo de las variables de entorno'

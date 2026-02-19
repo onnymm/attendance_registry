@@ -17,22 +17,22 @@ from ._constants import (
 from ._interface import _Base_Assistance
 from ._resources import _DeviceInfo
 from ._settings import CONFIG
-from ._types import (
-    _T,
-    _DateOrDateRange,
-    _DatetimeOrString,
+from ._typing import (
+    _D,
+    DateOrDateRange,
+    DatetimeOrString,
 )
 
-class _ExecutionContext(Generic[_T]):
+class _ExecutionContext(Generic[_D]):
     start_date: str
     end_date: str
     devices: list[_DeviceInfo]
 
     def __init__(
         self,
-        main: _Base_Assistance[_T],
-        date_or_range: _DateOrDateRange,
-        device: Optional[_T] = None,
+        main: _Base_Assistance[_D],
+        date_or_range: DateOrDateRange,
+        device: Optional[_D] = None,
     ) -> None:
 
         # Asignación de instancia principal
@@ -102,7 +102,7 @@ class _ExecutionContext(Generic[_T]):
 
         def _define_date_range(
             self,
-            date_or_range: _DateOrDateRange,
+            date_or_range: DateOrDateRange,
         ) -> tuple[str, str]:
 
             # Si el valor de fecha es una tupla...
@@ -122,7 +122,7 @@ class _ExecutionContext(Generic[_T]):
 
         def _resolve_date_range(
             self,
-            value: tuple[_DatetimeOrString, _DatetimeOrString],
+            value: tuple[DatetimeOrString, DatetimeOrString],
         ) -> None:
 
             # Si la tupla no contiene exactamente dos elementos...
