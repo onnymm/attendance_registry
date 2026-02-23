@@ -125,7 +125,7 @@ class Assistance(_Base_Assistance[_D]):
         # Si no existen registros en el día...
         if not records:
             # Se genera un DataFrame vacío
-            data = self._build_empty_data()
+            data = self._processing._build_empty_data()
 
             return data
 
@@ -188,22 +188,6 @@ class Assistance(_Base_Assistance[_D]):
         pages = total_matches // CONFIG.MAX_RESULTS_QTY + int(total_matches % CONFIG.MAX_RESULTS_QTY > 0)
 
         return (first_response, pages)
-
-    def _build_empty_data(
-        self,
-    ) -> pd.DataFrame:
-
-        # Inicialización del DataFrame vacío
-        records = (
-            pd.DataFrame(
-                # Selección de columnas
-                columns= SELECTED_COLUMNS
-            )
-            # Tipado de columnas
-            .astype(ASSIGNED_DTYPES)
-        )
-
-        return records
 
     def _get_access_event_data_page(
         self,

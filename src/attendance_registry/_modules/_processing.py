@@ -40,6 +40,11 @@ class _Processing:
             )
         }
 
+        # Si no hay datos por procesar...
+        if data.empty:
+            # Se retorna un DataFrame vacío
+            return self._build_empty_data()
+
         return (
             data
             # Se descartan todos los registros que no sean registro de asistencia
@@ -86,3 +91,19 @@ class _Processing:
             data
             .assign(**fix_values)
         )
+
+    def _build_empty_data(
+        self,
+    ) -> pd.DataFrame:
+
+        # Inicialización del DataFrame vacío
+        records = (
+            pd.DataFrame(
+                # Selección de columnas
+                columns= SELECTED_COLUMNS
+            )
+            # Tipado de columnas
+            .astype(ASSIGNED_DTYPES)
+        )
+
+        return records
