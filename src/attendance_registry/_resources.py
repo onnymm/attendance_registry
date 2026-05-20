@@ -1,10 +1,23 @@
-class _DeviceInfo:
+from datetime import datetime
+from dataclasses import dataclass
+from typing import TypedDict
+from ._typing import EventStatus
 
-    def __init__(
-        self,
-        label: str,
-        sn: str,
-    ) -> None:
+@dataclass(slots= True)
+class Device:
+    model: str
+    sn: str
+    os_version: str
 
-        self.label = label
-        self.sn = sn
+@dataclass(slots= True)
+class Credentials:
+    cookie: str
+    token: str
+    site_id: str
+
+@dataclass(slots= True)
+class ExecutionContext():
+    device: Device
+    credentials: Credentials
+    start_date: datetime
+    end_date: datetime

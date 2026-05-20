@@ -4,17 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "attendance_registry"
-version = "0.6.0b1"
+version = "0.1.0.a1"
 authors = [
     {name = "Pável Hernández Reza", email = "onnymm@outlook.com" }]
 description = "Pequeña librería diseñada para obtener registros de asistencia desde dispositivos HikVision de forma remota a través de su API."
 readme = "README.md"
 license = { file = "LICENSE" }
 dependencies = [
-    "dotenvironment==1.1.1",
-    "pandas~=2.3.3",
-    "requests",
-    "pydantic",
+    "requests==2.32.5",
 ]
 
 [tool.setuptools]

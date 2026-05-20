@@ -1,4 +1,24 @@
-from typing import TypedDict, Literal
+from typing import TypedDict
+from typing import Literal
+
+EventStatus = Literal['undefined', 'checkIn', 'breakOut', 'breakIn', 'checkOut']
+
+class _RequestData(TypedDict):
+    method: Literal['POST']
+    url: str
+    deviceSerial: str
+    accessToken: str
+    domain: Literal['https://iusopen.ezvizlife.com']
+    body: str
+    contentType: Literal['application/json']
+    bizType: 0
+    mainType: 5
+    subType: 9
+    deviceVersion: Literal['V1.2.7 build 240102']
+    model: Literal['DS-K1A340WX']
+    urlType: Literal['TEAM']
+    siteId: str
+
 
 class _AcsEventCondition(TypedDict):
     """
@@ -13,7 +33,7 @@ class _AcsEventCondition(TypedDict):
     startTime: str
     endTime: str
 
-class AcsEventSearchJSON(TypedDict):
+class _AcsEventSearchJSON(TypedDict):
     """
     #### JSON de condiciones de evento de acceso
     Este tipo de dato de JSON contiene las condiciones de evento de acceso y se usa
@@ -21,23 +41,7 @@ class AcsEventSearchJSON(TypedDict):
     """
     AcsEventCond: _AcsEventCondition
 
-class RequestData(TypedDict):
-    method: Literal['POST']
-    url: str
-    deviceSerial: str
-    accessToken: str
-    domain: Literal['https//iusopen.ezvizlife.com']
-    body: str
-    contentType: Literal['application/json']
-    bizType: 0
-    mainType: 5
-    subType: 9
-    deviceVersion: Literal['V1.2.7 build 240102']
-    model: Literal['DS-K1A340WX']
-    urlType: Literal['TEAM']
-    siteId: str
-
-class AccessEventInfo(TypedDict):
+class _AccessEventInfo(TypedDict):
     major: int
     minor: int
     time: str
@@ -68,12 +72,17 @@ class AccessEventInfo(TypedDict):
     attendanceStatus: str
     statusValue: int
 
-class AccessEvent(TypedDict):
+class _AccessEvent(TypedDict):
     searchID: str
     responseStatusStrg: Literal['More', 'OK', 'NO MATCH']
     numOfMatches: int
     totalMatches: int
-    InfoList: list[AccessEventInfo]
+    InfoList: list[_AccessEventInfo]
 
 class AccessEventsData(TypedDict):
-    AcsEvent: AccessEvent
+    AcsEvent: _AccessEvent
+
+class AssistanceEvent(TypedDict):
+    user_id: int
+    registry_time: str
+    status: EventStatus

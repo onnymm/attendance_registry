@@ -1,210 +1,237 @@
-import pandas as pd
-from datetime import date
-from typing import Optional
-from ._constants import COLUMN
-from ._execution_context import _ExecutionContext
-from ._interface import _Base_Assistance
-from ._resources import _DeviceInfo
-from ._settings import CONFIG
-from ._mapping import (
-    SELECTED_COLUMNS,
-    ASSIGNED_DTYPES,
-)
-from ._modules import (
-    _API,
-    _Params,
-    _Processing,
-)
-from ._typing import (
-    _D,
-    AccessEvent,
-    AccessEventInfo,
-    DateOrDateRange,
-)
+from datetime import datetime
+import json
+from uuid import uuid4
+import requests
+from ._constants import API_NOT_AVAIABLE_SHAPE
+from ._constants import ERROR_LABEL
+from ._constants import URL
+from ._errors import APINotAvailableError
+from ._resources import Credentials
+from ._resources import Device
+from ._resources import ExecutionContext
+from ._typing import _AccessEvent
+from ._typing import _AccessEventInfo
+from ._typing import _AcsEventSearchJSON
+from ._typing import _RequestData
+from ._typing import AccessEventsData
+from ._typing import AssistanceEvent
 
-class Assistance(_Base_Assistance[_D]):
+class Attendance():
 
-    def __init__(
+    def get_events(
         self,
-        devices: dict[_D, str],
-    ) -> None:
+        device_model: str,
+        device_sn: str,
+        device_os_version: str,
+        cookie: str,
+        token: str,
+        site_id: str,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list[AssistanceEvent]:
 
-        # Se guardan los datos de los dispositivos
-        self._devices_data = devices
-
-        # Inicialización de módulos
-        self._api = _API(self)
-        self._params = _Params(self)
-        self._processing = _Processing(self)
-
-    def get_today_attendance(
-        self,
-        device: Optional[_D] = None,
-    ) -> pd.DataFrame:
-        """
-        #### Obtención de los registros de asistencia del hoy
-        Este método obtiene los registros de asistencia del día de hoy, ya sea de un dispositivo
-        especificado o de todos los dispositivos.
-
-        Uso:
-        >>> # Obtención de los registros del día de hoy
-        >>> data = instance.get_today_attendance()
-        >>> 
-        >>> # Obtención de los registros del día de hoy por dispositivo específico
-        >>> data = instance.get_today_attendance('my_device_name')
-        """
-
-        # Obtención de la fecha del día de hoy
-        date_day = date.today()
-        # Obtención de los registros de asistencia del día
-        data = self.get_daily_attendance(date_day, device)
-
-        return data
-
-    def get_daily_attendance(
-        self,
-        date_or_range: DateOrDateRange,
-        device: Optional[_D] = None,
-    ) -> pd.DataFrame:
-        """
-        #### Obtención de registros diarios de asistencia
-        Este método obtiene todos los registros de asistencia de un día especificado o
-        un rango de fecha especificado con granularidad de día y opcionalmente
-        especificando un dispositivo.
-
-        Uso:
-        >>> # Obtención de los registros de un día especificado
-        >>> data = instance.get_daily_attendance('2025-08-21')
-        >>> 
-        >>> # Obtención de los registros de un rango de fecha
-        >>> data = instance.get_daily_attendance(('2025-08-01', '2025-08-31'))
-        >>> 
-        >>> # Obtención de los registros de un día por dispositivo específico
-        >>> data = instance.get_today_attendance('2025-08-21', 'my_device_name')
-        """
-
+        # Inicialización de objeto de dispositivo
+        device = Device(
+            device_model,
+            device_sn,
+            device_os_version,
+        )
+        # Inicialización de objeto de credenciales
+        credentials = Credentials(
+            cookie,
+            token,
+            site_id,
+        )
         # Inicialización de contexto de ejecución
-        ctx = _ExecutionContext(self, date_or_range, device)
-
-        # Inicialización de lista de DataFrames a concatenar para el resultado final
-        attendance: list[pd.DataFrame] = []
-
-        # Iteración por cada dispositivo
-        for device_i in ctx.devices:
-            # Obtención de los registros de asistencia del dispositivo i
-            attendance_i = self._get_device_attendance_per_date_range(ctx, device_i)
-            # Se añade el DataFrame obtenido a la lista de DataFrames por concatenar
-            attendance.append(attendance_i)
-
-        # Obtención de todos los registros de asistencia
-        total_attendance = (
-            # Concatenación de todos los DataFrames creados
-            pd.concat(attendance)
-            # Procesamiento de datos
-            .pipe(self._processing.process_data)
-            # Se ordenan los datos por fecha y hora de registro
-            .sort_values(COLUMN.REGISTRY_TIME)
+        ctx = ExecutionContext(
+            device,
+            credentials,
+            start_date,
+            end_date,
         )
-
-        return total_attendance
-
-    def _get_device_attendance_per_date_range(
-        self,
-        ctx: _ExecutionContext,
-        device: _DeviceInfo,
-    ) -> pd.DataFrame:
-        """
-        #### Obtención de registros de asistencia desde un dispositivo
-        Este método obtiene todos los registros de asistencia de un dispositivo que se
-        encuentren entre el rango de fecha especificado.
-        """
-
-        # Obtención de los datos desde la API
-        records = self._get_device_access_event_records_per_date_range(ctx, device.sn)
-
-        # Si no existen registros en el día...
-        if not records:
-            # Se genera un DataFrame vacío
-            data = self._processing._build_empty_data()
-
-            return data
-
-        # Procesamiento de los datos
-        data = (
-            # Conversión de la información a DataFrame
-            pd.DataFrame(records)
-            # Se asigna la columna de dispositivo
-            .assign(**{COLUMN.DEVICE: device.label})
-        )
-
-        return data
-
-    def _get_device_access_event_records_per_date_range(
-        self,
-        ctx: _ExecutionContext,
-        sn: str,
-    ) -> list[AccessEventInfo]:
-        """
-        #### Obtención de registros de acceso de dispositivo
-        Este método obtiene los registros de acceso de un dispositivo
-        desde la API en base a un rango de fecha especificado.
-        """
 
         # Inicialización de lista de eventos de acceso
-        access_event_records: list[AccessEventInfo] = []
+        access_event_records: list[_AccessEvent] = []
 
-        # Obtención de la primera respuesta desde la API y el total de registros encontrados
-        ( first_response, pages ) = self._get_first_response_and_total_matches(ctx, sn)
+        # Obtención de primera respuesta desde la API de HikVision
+        first_response = self._get_access_event(ctx)
 
-        # Si no existen registros encontrados...
+        # Si no existen registros nuevos...
         if first_response['responseStatusStrg'] == 'NO MATCH':
-            # Se retorna la lista vacía
-            return access_event_records
+            # Se retorna una lista vacía
+            return []
 
         # Se añade la primera página de resultados a la lista de eventos de acceso
         access_event_records += first_response['InfoList']
-        # Iteración por la cantidad de páginas para consultar desde la segunda página (Si es que hay más de una)
-        for i in range(1, pages):
-            # Cálculo de página
-            page = i * CONFIG.MAX_RESULTS_QTY
-            # Obtención de los datos desde la API
-            response = self._get_access_event_data_page(ctx, sn, page)
-            # Se añaden los resultados a la lista de eventos de acceso
-            access_event_records += response['InfoList']
 
-        return access_event_records
-
-    def _get_first_response_and_total_matches(
-        self,
-        ctx: _ExecutionContext,
-        sn: str,
-    ) -> tuple[AccessEvent, int]:
-
-        # Obtención de la primera respuesta desde la API para obtener el número total de registros existentes
-        first_response = self._get_access_event_data_page(ctx, sn)
         # Obtención del número total de registros existentes
         total_matches = first_response['totalMatches']
         # Cálculo de páginas totales para consultar
-        pages = total_matches // CONFIG.MAX_RESULTS_QTY + int(total_matches % CONFIG.MAX_RESULTS_QTY > 0)
+        pages = total_matches // 24 + int(total_matches % 24 > 0)
+        print(pages, total_matches)
+        # Iteración por la cantidad de páginas para consultar desde la segunda página (Si es que hay más de una)
+        for i in range(1, pages):
+            # Cálculo de página
+            page = i * 24
+            # Obtención de los datos desde la API
+            response = self._get_access_event(ctx, page)
+            # Se añaden los resultados a la lista de eventos de acceso
+            access_event_records += response['InfoList']
 
-        return (first_response, pages)
+        # Procesamiento de los registros
+        assistance_events = self.process(access_event_records)
 
-    def _get_access_event_data_page(
+        return assistance_events
+
+    def process(
         self,
-        ctx: _ExecutionContext,
-        sn: str,
-        page: int = 0,
-    ) -> AccessEvent:
-        """
-        #### Obtención de los eventos de acceso desde la API
-        Este endpoint obtiene los datos de una página de eventos de acceso
-        desde la API, de un dispositivo específico.
-        """
+        access_event_records: list[_AccessEventInfo],
+    ) -> list[AssistanceEvent]:
 
-        # Obtención del JSON y encabezados de eventos de acceso
-        access_event_json = self._params.build_access_event_search_json(ctx, sn, page)
-        access_event_headers = self._params.build_access_event_headers()
-        # Obtención de los datos de eventos de acceso
-        data = self._api.request(access_event_json, access_event_headers)
+        # Inicialización de lista de salida
+        assistance_events: list[AssistanceEvent] = []
+
+        # Iteración por cada registro de evento de acceso
+        for acc_evt_rcd in access_event_records:
+            # Si el valor en netUser es [admin]...
+            if acc_evt_rcd['netUser'] == 'admin':
+                # Se continúa al siguiente registro
+                continue
+            # Si no existe nombre de usuario...
+            if acc_evt_rcd['name'] == '':
+                # Se continúa al siguiente registro
+                continue
+
+            # Inicialización de diccionario de evento de asistencia
+            event: AssistanceEvent = {}
+            # Adición de valores
+            event['user_id'] = acc_evt_rcd['employeeNoString']
+            event['registry_time'] = acc_evt_rcd['time']
+            event['status'] = acc_evt_rcd['attendanceStatus']
+
+            # Se añade el diccionario a la lista de registros procesados
+            assistance_events.append(event)
+
+        return assistance_events
+
+    def _get_access_event(
+        self,
+        ctx: ExecutionContext,
+        page: int = 0,
+    ) -> _AccessEvent:
+
+        # Construcción del JSON y encabezados de eventos de acceso
+        access_event_json = self._build_access_event_search_json(ctx, page)
+        access_event_headers = self.build_access_event_headers(ctx)
+
+        # Solicitud de datos a la API y obtención de la respuesta de ésta
+        response = self._request(access_event_json, access_event_headers)
+
+        return response
+
+    def _request(
+        self,
+        access_event_search: _AcsEventSearchJSON,
+        headers: dict[str, str],
+    ) -> _AccessEvent:
+
+        # Solicitud de datos al endpoint
+        response = requests.post(
+            URL,
+            json= access_event_search,
+            headers= headers,
+        )
+
+        # Decodificación del contenido en formato JSON
+        content = json.loads(response.content)
+
+        if content == API_NOT_AVAIABLE_SHAPE:
+            # Se arroja error de API no disponible
+            raise APINotAvailableError(ERROR_LABEL.API_NOT_AVAILABLE)
+
+        # Obtención del cuerpo de los datos mediante otra decodificación en JSON
+        response_body: AccessEventsData = json.loads(content['data']['responseBody'])
+        # Obtención de los eventos de acceso
+        access_events = response_body['AcsEvent']
+
+        return access_events
+
+    def _build_access_event_search_json(
+        self,
+        ctx: ExecutionContext,
+        page: int,
+    ):
+
+        # Construcción de los parámetros de búsqueda de eventos
+        access_event_search = self._build_event_search_params(ctx, page)
+
+        # Construcción de los datos de la solicitud
+        data: _RequestData = {
+            'method': 'POST',
+            'url': '/ISAPI/AccessControl/AcsEvent?format=json',
+            'deviceSerial': ctx.device.sn,
+            'accessToken': ctx.credentials.token,
+            'domain': 'https://iusopen.ezvizlife.com',
+            'body': access_event_search,
+            'contentType': 'application/json',
+            'bizType': 0,
+            'mainType': 5,
+            'subType': 9,
+            'deviceVersion': ctx.device.os_version,
+            'model': ctx.device.model,
+            'urlType': 'TEAM',
+            'siteId': ctx.credentials.site_id,
+        }
 
         return data
+
+    def build_access_event_headers(
+        self,
+        ctx: ExecutionContext,
+    ) -> dict[str, str]:
+
+        # Construcción de los encabezados
+        headers = {
+            'Accept': '*/*',
+            'Accept-Encoding': 'gzip, deflate, br, zstd',
+            'Accept-Language': 'es-419,es;q=0.9',
+            'Content-Type': 'application/json',
+            'Cookie': f'JSESSIONID={ctx.credentials.cookie}',
+            'Origin': 'https://www.hik-connect.com',
+            'Priority': 'u=1, i',
+            'Referer': 'https://www.hik-connect.com/',
+            'Sec-Ch-Ua': '"Chromium";v="140", "Not=A?Brand";v="24", "Google Chrome";v="140"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'empty',
+            'Sec-Fetch-Mode': 'cors',
+            'Sec-Fetch-Site': 'cors-site',
+            'Sec-Fetch-Storage-Access': 'active',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36'
+        }
+
+        return headers
+
+    def _build_event_search_params(
+        self,
+        ctx: ExecutionContext,
+        page: int,
+    ) -> str:
+
+        # Construcción de los parámetros en diccionario
+        access_event_search: _AcsEventSearchJSON = {
+            'AcsEventCond': {
+                'searchID': uuid4().__str__(),
+                'searchResultPosition': page,
+                'maxResults': 24,
+                'major': 0,
+                'minor': 0,
+                'startTime': ctx.start_date.isoformat(timespec= 'seconds'),
+                'endTime': ctx.end_date.isoformat(timespec= 'seconds'),
+            }
+        }
+
+        # Conversión de los parámetros a JSON
+        json_params = json.dumps(access_event_search)
+
+        return json_params
