@@ -68,7 +68,6 @@ class Attendance():
         total_matches = first_response['totalMatches']
         # Cálculo de páginas totales para consultar
         pages = total_matches // 24 + int(total_matches % 24 > 0)
-        print(pages, total_matches)
         # Iteración por la cantidad de páginas para consultar desde la segunda página (Si es que hay más de una)
         for i in range(1, pages):
             # Cálculo de página
@@ -79,11 +78,11 @@ class Attendance():
             access_event_records += response['InfoList']
 
         # Procesamiento de los registros
-        assistance_events = self.process(access_event_records)
+        assistance_events = self._process(access_event_records)
 
         return assistance_events
 
-    def process(
+    def _process(
         self,
         access_event_records: list[_AccessEventInfo],
     ) -> list[AssistanceEvent]:
@@ -122,7 +121,7 @@ class Attendance():
 
         # Construcción del JSON y encabezados de eventos de acceso
         access_event_json = self._build_access_event_search_json(ctx, page)
-        access_event_headers = self.build_access_event_headers(ctx)
+        access_event_headers = self._build_access_event_headers(ctx)
 
         # Solicitud de datos a la API y obtención de la respuesta de ésta
         response = self._request(access_event_json, access_event_headers)
@@ -185,7 +184,7 @@ class Attendance():
 
         return data
 
-    def build_access_event_headers(
+    def _build_access_event_headers(
         self,
         ctx: ExecutionContext,
     ) -> dict[str, str]:
