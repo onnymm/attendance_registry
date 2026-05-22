@@ -5,5 +5,8 @@ URL del endpoint para obtención de registros de asistencia
 
 API_NOT_AVAIABLE_SHAPE = {'data': {'responseCode': 0}, 'errorCode': '0'}
 
+EXPIRED_CREDENTIALS_SHAPE = {'errorCode': 'VMS002004', 'message': 'You need login first.'}
+
 class ERROR_LABEL:
-    API_NOT_AVAILABLE = 'La API de HikVision no está disponible temporalmente'
+    API_NOT_AVAILABLE = 'La API de HikVision no está disponible temporalmente.'
+    EXPIRED_CREDENTIALS = 'Las credenciales provistas han expirado.'

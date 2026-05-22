@@ -3,9 +3,11 @@ import json
 from uuid import uuid4
 import requests
 from ._constants import API_NOT_AVAIABLE_SHAPE
+from ._constants import EXPIRED_CREDENTIALS_SHAPE
 from ._constants import ERROR_LABEL
 from ._constants import URL
 from ._errors import APINotAvailableError
+from ._errors import ExpiredCredentialsError
 from ._resources import Credentials
 from ._resources import Device
 from ._resources import ExecutionContext
@@ -147,6 +149,10 @@ class Attendance():
         if content == API_NOT_AVAIABLE_SHAPE:
             # Se arroja error de API no disponible
             raise APINotAvailableError(ERROR_LABEL.API_NOT_AVAILABLE)
+
+        if content == EXPIRED_CREDENTIALS_SHAPE:
+            # Se arroja error de credenciales expiradas
+            raise ExpiredCredentialsError(ERROR_LABEL.EXPIRED_CREDENTIALS)
 
         # Obtención del cuerpo de los datos mediante otra decodificación en JSON
         response_body: AccessEventsData = json.loads(content['data']['responseBody'])
